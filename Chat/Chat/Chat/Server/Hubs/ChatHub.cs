@@ -15,7 +15,7 @@ public class ChatHub : Hub
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        string username = Context.GetHttpContext().Request.Query["username"];;
+        string username = Context.GetHttpContext().Request.Query["username"];
         await AddMessage(String.Empty, $"{username} disconnected!");
     }
 

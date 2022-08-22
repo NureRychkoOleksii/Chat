@@ -1,14 +1,16 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.SignalR.Client
+@using Chat.Shared.Models
 @inject NavigationManager NavigationManager
 @inject IJSRuntime _jsRuntime
+@inject HttpClient Http
 <PageTitle>Chat</PageTitle>
 <h3>SignalR Chat</h3>
 
 @if (!IsConnected)
 {
     <div class="input-group">
-        <input @bind="username" class="form-control" @onkeyup="HandleConnection" placeholder="Enter your name"/>
+        <input @bind="user.Name" class="form-control" @onkeyup="HandleConnection" placeholder="Enter your name"/>
         <button class="btn btn-primary form-control-append" 
                 @onclick="Connect">Connect</button>
     </div>
@@ -32,21 +34,22 @@ else
 
 @code{
     private HubConnection? hubConnection;
-    private string messages = String.Empty;
-    private string username = String.Empty;
+    private List<Message> messages = new List<Message>();
+    //private Chat chat;
+    private User user = new User();
     private string message = String.Empty;
     ElementReference TextAreaRef;
 
     private async Task Connect()
     {
         hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri($"/privatechathub?username={username}"))
+            .WithUrl(NavigationManager.ToAbsoluteUri($"/privatechathub?username={user.Name}"))
             .Build();
 
         hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
         {
             var actualMessage = $"{(string.IsNullOrEmpty(user) ? "" : user + ": ")}{message}";
-            messages += actualMessage + "\n";
+            messages.Add(new Message() {Content = actualMessage + "\n", User=this.user});
             _jsRuntime.InvokeVoidAsync("scrollToBottom", TextAreaRef);
             StateHasChanged();
         });
@@ -54,11 +57,16 @@ else
         await hubConnection.StartAsync();
     }
 
+    // private async Task ChooseChat()
+    // {
+    //     await Http.GetAsync()
+    // }
+
     private async Task Send()
     {
         if (hubConnection != null)
         {
-            await hubConnection.SendAsync("AddMessage", username, message);
+            await hubConnection.SendAsync("AddMessage", user.Name, message);
             message = String.Empty;
         }
     }

@@ -1,4 +1,4 @@
-﻿namespace Chat.Server.Data.Models;
+﻿namespace Chat.Shared.Models;
 
 public class BaseEntity
 {

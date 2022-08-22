@@ -1,5 +1,4 @@
-﻿namespace Chat.Server.Data.Models;
-
+﻿namespace Chat.Shared.Models;
 public class Message : BaseEntity
 {
     public string Content { get; set; }
@@ -7,4 +6,6 @@ public class Message : BaseEntity
     public User User { get; set; }
 
     public Chat Chat { get; set; }
+    
+    public DateTime DateCreated { get; set; }
 }

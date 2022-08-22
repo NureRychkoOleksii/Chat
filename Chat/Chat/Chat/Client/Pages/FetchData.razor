@@ -1,14 +1,12 @@
 ﻿@page "/fetchdata"
-@using Chat.Shared
+@using Chat.Shared.Models
 @inject HttpClient Http
 
-<PageTitle>Weather forecast</PageTitle>
+<PageTitle>Users</PageTitle>
 
-<h1>Weather forecast</h1>
+<h1>Users</h1>
 
-<p>This component demonstrates fetching data from the server.</p>
-
-@if (forecasts == null)
+@if (users == null)
 {
     <p><em>Loading...</em></p>
 }
@@ -17,20 +15,14 @@ else
     <table class="table">
         <thead>
             <tr>
-                <th>Date</th>
-                <th>Temp. (C)</th>
-                <th>Temp. (F)</th>
-                <th>Summary</th>
+                <th>Name</th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var forecast in forecasts)
+            @foreach (var user in users)
             {
                 <tr>
-                    <td>@forecast.Date.ToShortDateString()</td>
-                    <td>@forecast.TemperatureC</td>
-                    <td>@forecast.TemperatureF</td>
-                    <td>@forecast.Summary</td>
+                    <td>@user.Name</td>
                 </tr>
             }
         </tbody>
@@ -38,10 +30,10 @@ else
 }
 
 @code {
-    private WeatherForecast[]? forecasts;
+    private List<User> users;
 
     protected override async Task OnInitializedAsync()
     {
-        forecasts = await Http.GetFromJsonAsync<WeatherForecast[]>("WeatherForecast");
+        users = await Http.GetFromJsonAsync<List<User>>("User");
     }
 }
