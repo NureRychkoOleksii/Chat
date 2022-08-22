@@ -1,5 +1,6 @@
 using Chat.Server.Hubs;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +13,8 @@ builder.Services.AddResponseCompression(options =>
 {
     options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[] {"application/octet-stream"});
 });
+builder.Services.AddDbContext<Chat.Server.Data.AppContext>(options => options
+    .UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 
@@ -33,7 +36,7 @@ app.UseBlazorFrameworkFiles();
 app.UseStaticFiles();
 
 app.UseRouting();
-app.MapHub<PrivateChatHub>("/privatechathub");
+app.MapHub<ChatHub>("/privatechathub");
 
 
 app.MapRazorPages();

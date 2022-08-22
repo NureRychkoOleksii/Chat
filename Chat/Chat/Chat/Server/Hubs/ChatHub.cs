@@ -2,7 +2,7 @@
 
 namespace Chat.Server.Hubs;
 
-public class PrivateChatHub : Hub
+public class ChatHub : Hub
 {
     private Dictionary<string, string> users = new();
     public override async Task OnConnectedAsync()
