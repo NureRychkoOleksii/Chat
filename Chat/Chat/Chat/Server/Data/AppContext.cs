@@ -7,7 +7,9 @@ namespace Chat.Server.Data;
 
 public class AppContext : DbContext
 {
-    private DbSet<User> users;
+    public DbSet<User> Users { get; set; }
+    public DbSet<Models.Chat> Chats { get; set; }
+    public DbSet<Message> Messages { get; set; }
     public AppContext(DbContextOptions<AppContext> options) : base(options)
     {
         
