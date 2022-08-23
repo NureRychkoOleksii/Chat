@@ -26,5 +26,13 @@ namespace Chat.Server.Controllers
 
             return Ok(usersAsync);
         }
+
+        [HttpGet("{name}")]
+        public async Task<IActionResult> GetUserByName(string name)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == name);
+
+            return Ok(user);
+        }
     }
 }

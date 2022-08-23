@@ -7,18 +7,53 @@
 <PageTitle>Chat</PageTitle>
 <h3>SignalR Chat</h3>
 
-@if (!IsConnected)
+@if (!isUserLogin)
 {
     <div class="input-group">
         <input @bind="user.Name" class="form-control" @onkeyup="HandleConnection" placeholder="Enter your name"/>
         <button class="btn btn-primary form-control-append" 
-                @onclick="Connect">Connect</button>
+                @onclick="ChooseUser">Login</button>
+    </div>
+}
+else if (!isChatChosen)
+{
+    <div class="row justify-content-center">
+        <div class="col-auto">
+            <div class="table">
+                <thead>
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Connect</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var u in users)
+                {
+                    @if (u.Id == user.Id)
+                    {
+                        continue;
+                    }
+                    <tr>
+                        <th scope="row">@u.Id</th>
+                        <th>@u.Name</th>
+                        <th>
+                            <button class="btn btn-primary" @onclick="Connect">Connect</button>
+                        </th>
+                    </tr>
+                }
+                </tbody>
+            </div>
+            </div>
     </div>
 }
 else
 {
     <textarea style="width:100%; height: 500px;" @ref="TextAreaRef" disabled="disabled">
-    @messages
+    @foreach (var m in messages)
+    {
+        @m.Content;
+    }
 </textarea>
     <div class="input-group">
         <input @bind="message"
@@ -35,8 +70,9 @@ else
 @code{
     private HubConnection? hubConnection;
     private List<Message> messages = new List<Message>();
-    //private Chat chat;
+    private Chat chat = new Chat();
     private User user = new User();
+    private List<User> users = new();
     private string message = String.Empty;
     ElementReference TextAreaRef;
 
@@ -55,12 +91,14 @@ else
         });
         
         await hubConnection.StartAsync();
+        isChatChosen = true;
     }
 
-    // private async Task ChooseChat()
-    // {
-    //     await Http.GetAsync()
-    // }
+     private async Task ChooseChat()
+     {
+         
+         chat = await Http.GetFromJsonAsync<Chat>("api/chats");
+     }
 
     private async Task Send()
     {
@@ -71,6 +109,8 @@ else
         }
     }
     private bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
+    private bool isUserLogin = false;
+    private bool isChatChosen = false;
 
     public async ValueTask DisposeAsync()
     {
@@ -78,6 +118,16 @@ else
         {
             await hubConnection.DisposeAsync();
         }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        users = await Http.GetFromJsonAsync<List<User>>($"api/user");
+    }
+
+    private void ChooseUser()
+    {
+        user = users.FirstOrDefault(u => u.Name == user.Name);
+        isUserLogin = true;
     }
 
     private async Task HandleInput(KeyboardEventArgs args)
@@ -87,11 +137,11 @@ else
             await Send();
         }
     }
-    private async Task HandleConnection(KeyboardEventArgs args)
+    private void HandleConnection(KeyboardEventArgs args)
     {
         if (args.Key.Equals("Enter"))
         {
-            await Connect();
+            ChooseUser();
         }
     }
 

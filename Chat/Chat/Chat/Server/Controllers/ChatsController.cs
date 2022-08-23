@@ -30,6 +30,13 @@ namespace Chat.Server.Controllers
             return Ok(chats);
         }
 
+        [HttpGet("get/{id}")]
+        public async Task<IActionResult> GetChatById(int id)
+        {
+            var chats = await _context.Chats.ToListAsync();
+            return Ok(chats.FirstOrDefault(ch => ch.Id == id));
+        }
+
         [HttpPost]
         public async Task<IActionResult> CreateChat([FromBody]ChatDTO chat)
         {
