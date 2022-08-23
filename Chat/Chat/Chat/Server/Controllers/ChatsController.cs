@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Chat.Server.Data;
 using Chat.Shared.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -30,11 +29,11 @@ namespace Chat.Server.Controllers
             return Ok(chats);
         }
 
-        [HttpGet("get/{id}")]
-        public async Task<IActionResult> GetChatById(int id)
+        [HttpGet("get/{name}")]
+        public async Task<IActionResult> GetChatByName(string name)
         {
             var chats = await _context.Chats.ToListAsync();
-            return Ok(chats.FirstOrDefault(ch => ch.Id == id));
+            return Ok(chats.FirstOrDefault(ch => ch.ChatName == name));
         }
 
         [HttpPost]

@@ -25,7 +25,10 @@ namespace Chat.Server.Controllers
         [HttpPost]
         public async Task<IActionResult> AddMessage([FromBody]MessageDTO message)
         {
-            await _context.Messages.AddAsync(new Message(){Content = message.Content, Chat = message.Chat, User = message.User, DateCreated = DateTime.Now});
+            var chat = await _context.Chats.FirstOrDefaultAsync(ch => ch.ChatName == message.Chat);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == message.User);
+            await _context.Messages.AddAsync(new Message(){Content = message.Content, Chat = chat, User = user, DateCreated = DateTime.Now});
+            await _context.SaveChangesAsync();
 
             return Ok();
         }

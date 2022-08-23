@@ -1,6 +1,8 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.SignalR.Client
 @using Chat.Shared.Models
+@using Newtonsoft.Json
+@using System.Net.Http.Headers
 @inject NavigationManager NavigationManager
 @inject IJSRuntime _jsRuntime
 @inject HttpClient Http
@@ -38,7 +40,7 @@ else if (!isChatChosen)
                         <th scope="row">@u.Id</th>
                         <th>@u.Name</th>
                         <th>
-                            <button class="btn btn-primary" @onclick="Connect">Connect</button>
+                            <button class="btn btn-primary" @onclick="() => Connect(u)">Connect</button>
                         </th>
                     </tr>
                 }
@@ -52,7 +54,7 @@ else
     <textarea style="width:100%; height: 500px;" @ref="TextAreaRef" disabled="disabled">
     @foreach (var m in messages)
     {
-        @m.Content;
+        @(m.Content + "\n");
     }
 </textarea>
     <div class="input-group">
@@ -76,7 +78,7 @@ else
     private string message = String.Empty;
     ElementReference TextAreaRef;
 
-    private async Task Connect()
+    private async Task Connect(User u)
     {
         hubConnection = new HubConnectionBuilder()
             .WithUrl(NavigationManager.ToAbsoluteUri($"/privatechathub?username={user.Name}"))
@@ -85,19 +87,31 @@ else
         hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
         {
             var actualMessage = $"{(string.IsNullOrEmpty(user) ? "" : user + ": ")}{message}";
-            messages.Add(new Message() {Content = actualMessage + "\n", User=this.user});
+            var msg = new Message() {Content = actualMessage, User = this.user, Chat = chat, DateCreated = DateTime.Now};
+            messages.Add(msg);
+            // var myContent = JsonConvert.SerializeObject(msg);
+            // var buffer = System.Text.Encoding.UTF8.GetBytes(myContent);
+            // var byteContent = new ByteArrayContent(buffer);
+            // byteContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            Http.PostAsJsonAsync("api/message", new MessageDTO(){Content = msg.Content, Chat = msg.Chat.ChatName, User = msg.User.Name});
             _jsRuntime.InvokeVoidAsync("scrollToBottom", TextAreaRef);
             StateHasChanged();
         });
         
         await hubConnection.StartAsync();
         isChatChosen = true;
+        chat.ChatName = $"{user.Name}And{u.Name}";
+        await ChooseChat(u);
     }
 
-     private async Task ChooseChat()
+     private async Task ChooseChat(User u)
      {
-         
-         chat = await Http.GetFromJsonAsync<Chat>("api/chats");
+         var chats = await Http.GetFromJsonAsync<List<Chat>>("api/chats");
+         if (chats.Any(ch => ch.ChatName == chat.ChatName))
+         {
+             return;
+         }
+         await Http.PostAsJsonAsync("api/chats", new ChatDTO() {ChatName = chat.ChatName, FirstUserName = user.Name, SecondUserName = u.Name});
      }
 
     private async Task Send()
