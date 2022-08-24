@@ -1,4 +1,7 @@
-﻿namespace Chat.Shared.Models;
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
+
+namespace Chat.Shared.Models;
 
 public class User : BaseEntity
 {

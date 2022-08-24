@@ -17,6 +17,7 @@ builder.Services.AddDbContext<Chat.Server.Data.AppContext>(options => options
     .UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

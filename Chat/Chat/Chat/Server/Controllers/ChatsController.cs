@@ -24,35 +24,68 @@ namespace Chat.Server.Controllers
         [HttpGet]
         public async Task<IActionResult> GetChats()
         {
-            var chats = await _context.Chats.ToListAsync();
-
+            var chatsAsync = await _context.Chats.Include(u => u.Users).ToListAsync();
+            var chats = new List<Shared.Models.UserAndChatDTOS.ChatDTO>();
+            foreach (var ch in chatsAsync)
+            {
+                chats.Add(new Shared.Models.UserAndChatDTOS.ChatDTO
+                {
+                    IsPrivate = ch.IsPrivate, Id = ch.Id, ChatName = ch.ChatName,
+                    UsersId = ch.Users.Select(u => u.Id).ToList()
+                });
+            }
+            
             return Ok(chats);
         }
 
         [HttpGet("get/{name}")]
         public async Task<IActionResult> GetChatByName(string name)
         {
-            var chats = await _context.Chats.ToListAsync();
+            var chatsAsync = await _context.Chats.ToListAsync();
+            var chats = new List<Shared.Models.UserAndChatDTOS.ChatDTO>();
+            chatsAsync.ForEach(ch =>
+            {
+                chats.Add(new Shared.Models.UserAndChatDTOS.ChatDTO()
+                    {Id = ch.Id, ChatName = ch.ChatName, UsersId = ch.Users.Select(u => u.Id).ToList()} );
+            });
             return Ok(chats.FirstOrDefault(ch => ch.ChatName == name));
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateChat([FromBody]ChatDTO chat)
+        public async Task<IActionResult> CreateChat([FromBody]ChatToApiDTO chatToApi)
         {
             var users = await _context.Users.ToListAsync();
-            var firstUser = users.FirstOrDefault(u => u.Name == chat.FirstUserName);
-            var secondUser = users.FirstOrDefault(u => u.Name == chat.SecondUserName);
-
+            var firstUser = users.FirstOrDefault(u => u.Name == chatToApi.FirstUserName);
+            var secondUser = users.FirstOrDefault(u => u.Name == chatToApi.SecondUserName);
             users = new List<User>()
             {
                 firstUser,
                 secondUser
             };
-            
-            await _context.Chats.AddAsync(new Shared.Models.Chat() {ChatName = chat.ChatName, Users = users});
+            var chatToCreate = new Shared.Models.Chat() {ChatName = chatToApi.ChatName, Users = users};
+
+            await _context.Chats.AddAsync(chatToCreate);
             await _context.SaveChangesAsync();
 
             return Ok();
         }
+
+        [HttpPut("addUser")]
+        public async Task<IActionResult> AddUserToChat([FromBody]ChatToUpdateDTO chatDto)
+        {
+            var chat = await _context.Chats.Include(ch => ch.Users)
+                .FirstOrDefaultAsync(ch => ch.ChatName == chatDto.ChatName);
+
+            var user = await _context.Users.Include(u => u.Chats)
+                .FirstOrDefaultAsync(u => u.Id == chatDto.userToUpdate);
+            
+            
+            chat.Users.Add(user);
+            _context.Chats.Update(chat);
+            await _context.SaveChangesAsync();
+            
+            return Ok();
+        }
+        
     }
 }

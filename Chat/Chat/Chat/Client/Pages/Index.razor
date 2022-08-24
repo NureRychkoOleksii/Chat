@@ -3,6 +3,9 @@
 @using Chat.Shared.Models
 @using Newtonsoft.Json
 @using System.Net.Http.Headers
+@using UserDTO = Chat.Shared.Models.UserAndChatDTOS.UserDTO
+@using ChatDTO = Chat.Shared.Models.UserAndChatDTOS.ChatDTO
+@using MessageDTO = Chat.Shared.Models.UserAndChatDTOS.MessageDTO
 @inject NavigationManager NavigationManager
 @inject IJSRuntime _jsRuntime
 @inject HttpClient Http
@@ -23,26 +26,44 @@ else if (!isChatChosen)
         <div class="col-auto">
             <div class="table">
                 <thead>
-                <tr>
-                    <th scope="col">#</th>
-                    <th scope="col">Name</th>
-                    <th scope="col">Connect</th>
-                </tr>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Connect</th>
+                    </tr>
                 </thead>
                 <tbody>
-                @foreach (var u in users)
-                {
-                    @if (u.Id == user.Id)
+                    @foreach (var u in users)
                     {
-                        continue;
+                        @if (u.Id == user.Id)
+                        {
+                            continue;
+                        }
+                        
+                        <tr>
+                            <th scope="row">@u.Id</th>
+                            <th>@u.Name</th>
+                            <th>
+                                <button class="btn btn-primary" @onclick="() => Connect(u)">Connect</button>
+                            </th>
+                        </tr>
                     }
-                    <tr>
-                        <th scope="row">@u.Id</th>
-                        <th>@u.Name</th>
-                        <th>
-                            <button class="btn btn-primary" @onclick="() => Connect(u)">Connect</button>
-                        </th>
-                    </tr>
+                @foreach (var ch in chats)
+                {
+                    if (!ch.IsPrivate)
+                    {
+                        <tr>
+                            <th scope="row">@ch.Id</th>
+                            <th>@ch.ChatName</th>
+                            <th>
+                                <button 
+                                    class="btn btn-primary" 
+                                    @onclick="() => { 
+                                    chat.ChatName = ch.ChatName;
+                                    Connect(isChatPrivate: false); }">Connect</button>
+                            </th>
+                        </tr>
+                    }
                 }
                 </tbody>
             </div>
@@ -71,48 +92,70 @@ else
 
 @code{
     private HubConnection? hubConnection;
-    private List<Message> messages = new List<Message>();
-    private Chat chat = new Chat();
-    private User user = new User();
-    private List<User> users = new();
+    private List<MessageDTO> messages = new List<MessageDTO>();
+    private ChatDTO chat = new ();
+    private UserDTO user = new ();
+    private List<ChatDTO> chats = new();
+    private List<UserDTO> users = new();
     private string message = String.Empty;
     ElementReference TextAreaRef;
 
-    private async Task Connect(User u)
+    private async Task Connect(UserDTO u = null, bool isChatPrivate = true)
     {
         hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri($"/privatechathub?username={user.Name}"))
-            .Build();
+                .WithUrl(NavigationManager.ToAbsoluteUri($"/privatechathub?username={user.Name}"))
+                .Build();
 
-        hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+            hubConnection.On<string, string>("ReceiveMessage", async (user, message) =>
+            {
+                var actualMessage = $"{(string.IsNullOrEmpty(user) ? "" : user + ": ")}{message}";
+                var msg = new MessageDTO()
+                {Content = actualMessage, User = this.user, Chat = chat, DateCreated = DateTime.Now};
+                messages.Add(msg);
+                StateHasChanged();
+                await Http.PostAsJsonAsync("api/message", new MessageTOApiDTO()
+                {Content = msg.Content, Chat = msg.Chat.ChatName, User = msg.User.Name});
+                await _jsRuntime.InvokeVoidAsync("scrollToBottom", TextAreaRef);
+            });
+
+        if (isChatPrivate)
         {
-            var actualMessage = $"{(string.IsNullOrEmpty(user) ? "" : user + ": ")}{message}";
-            var msg = new Message() {Content = actualMessage, User = this.user, Chat = chat, DateCreated = DateTime.Now};
-            messages.Add(msg);
-            // var myContent = JsonConvert.SerializeObject(msg);
-            // var buffer = System.Text.Encoding.UTF8.GetBytes(myContent);
-            // var byteContent = new ByteArrayContent(buffer);
-            // byteContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-            Http.PostAsJsonAsync("api/message", new MessageDTO(){Content = msg.Content, Chat = msg.Chat.ChatName, User = msg.User.Name});
-            _jsRuntime.InvokeVoidAsync("scrollToBottom", TextAreaRef);
-            StateHasChanged();
-        });
+            chat.ChatName = $"{user.Name}And{u.Name}";
+            await ChooseChat(u);
+        }
         
-        await hubConnection.StartAsync();
+        else
+        {
+            await AddUserToChat(chat.ChatName);
+        }
+        
         isChatChosen = true;
-        chat.ChatName = $"{user.Name}And{u.Name}";
-        await ChooseChat(u);
+        await hubConnection.StartAsync();
+        
     }
 
-     private async Task ChooseChat(User u)
+     private async Task ChooseChat(UserDTO u)
      {
-         var chats = await Http.GetFromJsonAsync<List<Chat>>("api/chats");
          if (chats.Any(ch => ch.ChatName == chat.ChatName))
          {
              return;
          }
-         await Http.PostAsJsonAsync("api/chats", new ChatDTO() {ChatName = chat.ChatName, FirstUserName = user.Name, SecondUserName = u.Name});
+
+         await Http.PostAsJsonAsync("api/chats",
+             new ChatToApiDTO() {ChatName = chat.ChatName, FirstUserName = user.Name, SecondUserName = u.Name});
      }
+
+    private async Task AddUserToChat(string chatName)
+    {
+        chat = chats.FirstOrDefault(ch => ch.ChatName == chatName);
+        if (chat.UsersId.Contains(user.Id))
+        {
+            return;
+        }
+
+        await Http.PutAsJsonAsync("api/chats/addUser",new ChatToUpdateDTO()
+        {ChatName = chat.ChatName, userToUpdate = user.Id});
+    }
 
     private async Task Send()
     {
@@ -135,7 +178,8 @@ else
     }
     protected override async Task OnInitializedAsync()
     {
-        users = await Http.GetFromJsonAsync<List<User>>($"api/user");
+        users = await Http.GetFromJsonAsync<List<UserDTO>>("api/user");
+        chats = await Http.GetFromJsonAsync<List<ChatDTO>>("api/chats");
     }
 
     private void ChooseUser()

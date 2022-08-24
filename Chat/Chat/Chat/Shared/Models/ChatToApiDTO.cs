@@ -1,6 +1,6 @@
 ﻿namespace Chat.Shared.Models;
 
-public class ChatDTO
+public class ChatToApiDTO
 {
     public string ChatName { get; set; }
 

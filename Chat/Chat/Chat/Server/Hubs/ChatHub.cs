@@ -5,6 +5,7 @@ namespace Chat.Server.Hubs;
 public class ChatHub : Hub
 {
     private Dictionary<string, string> users = new();
+    
     public override async Task OnConnectedAsync()
     {
         string username = Context.GetHttpContext().Request.Query["username"];

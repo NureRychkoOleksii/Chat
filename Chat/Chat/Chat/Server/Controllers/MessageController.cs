@@ -23,11 +23,12 @@ namespace Chat.Server.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> AddMessage([FromBody]MessageDTO message)
+        public async Task<IActionResult> AddMessage([FromBody]MessageTOApiDTO messageToApi)
         {
-            var chat = await _context.Chats.FirstOrDefaultAsync(ch => ch.ChatName == message.Chat);
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == message.User);
-            await _context.Messages.AddAsync(new Message(){Content = message.Content, Chat = chat, User = user, DateCreated = DateTime.Now});
+            var chat = await _context.Chats.FirstOrDefaultAsync(ch => ch.ChatName == messageToApi.Chat);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == messageToApi.User);
+            await _context.Messages.AddAsync(new Message()
+                {Content = messageToApi.Content, Chat = chat, User = user, DateCreated = DateTime.Now});
             await _context.SaveChangesAsync();
 
             return Ok();

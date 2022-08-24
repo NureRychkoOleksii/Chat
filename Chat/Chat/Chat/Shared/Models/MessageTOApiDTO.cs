@@ -2,7 +2,7 @@
 
 namespace Chat.Shared.Models;
 
-public class MessageDTO
+public class MessageTOApiDTO
 {
     public string Content { get; set; }
 
