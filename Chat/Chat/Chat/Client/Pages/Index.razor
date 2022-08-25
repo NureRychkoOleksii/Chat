@@ -98,7 +98,7 @@ else
                     <p>@(m.Content)</p>
                     <div class="d-flex justify-content-between gap-2">
                         <p class = "@(showChange ? "visible" : "invisible")"
-                           @onclick="() => { Open(); changingMessage=m.Content;}">Change</p>
+                           @onclick="() => { Open(); changingMessage=m.Content; changedMessage = m.Content;}">Change</p>
                         <p class = "@(showChange ? "visible" : "invisible")">Delete</p>
                     </div>
                 </div>
@@ -129,6 +129,7 @@ else
     private bool showModal = false;
     private string messageToChange = String.Empty;
     private string changingMessage = String.Empty;
+    private string changedMessage = String.Empty;
     private bool isChanged = false;
     ElementReference TextAreaRef;
 
@@ -142,11 +143,16 @@ else
             {
                 var actualMessage = $"{(string.IsNullOrEmpty(user) ? "" : user + ": ")}{message}";
                 var msg = new MessageDTO()
-                {Content = actualMessage, User = this.user, Chat = chat, DateCreated = DateTime.Now};
+                {Content = actualMessage, User = this.user.Id, Chat = chat.Id};
                 messages.Add(msg);
                 StateHasChanged();
-                await Http.PostAsJsonAsync("api/message", new MessageTOApiDTO()
-                {Content = msg.Content, Chat = msg.Chat.ChatName, User = msg.User.Name});
+                var messageToApi = new MessageTOApiDTO()
+                {
+                    Content = msg.Content,
+                    Chat = chat.ChatName,
+                    User = this.user.Name
+                };
+                await Http.PostAsJsonAsync("api/message", messageToApi);
                 await _jsRuntime.InvokeVoidAsync("scrollToBottom", TextAreaRef);
             });
 
@@ -246,12 +252,15 @@ else
         }
     }
 
-    private void Save(string msg = "")
+    private async Task Save(string msg = "")
     {
         if (msg is not null)
         {
             ChangeMessage(msg);
         }
+       await Http.PutAsJsonAsync("api/message/changeMessage", new MessageDTO()
+       {Chat = chat.Id, PreviousMessage = messageToChange,
+           User = user.Id, Content = changedMessage, DateCreated = DateTime.Now});
     }
     
     public Guid Guid = Guid.NewGuid();

@@ -2,7 +2,7 @@
 
 namespace Chat.Shared.Models;
 
-public class MessageTOApiDTO
+public class MessageTOApiDTO : BaseEntity
 {
     public string Content { get; set; }
 

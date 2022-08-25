@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Chat.Server.Data;
 using Chat.Shared.Models;
+using Chat.Shared.Models.UserAndChatDTOS;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +32,21 @@ namespace Chat.Server.Controllers
                 {Content = messageToApi.Content, Chat = chat, User = user, DateCreated = DateTime.Now});
             await _context.SaveChangesAsync();
 
+            return Ok();
+        }
+        
+        [HttpPut("changeMessage")]
+        public async Task<IActionResult> ChangeMessage([FromBody]MessageDTO message)
+        {
+            var messageToUpdate = await
+                _context.Messages.FirstOrDefaultAsync(m =>
+                    m.User.Id == message.User && message.Content == m.Content);
+
+            messageToUpdate.Content = message.PreviousMessage;
+            
+            _context.Messages.Update(messageToUpdate);
+            await _context.SaveChangesAsync();
+            
             return Ok();
         }
     }
