@@ -1,16 +1,34 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.SignalR.Client
 @using Chat.Shared.Models
-@using Newtonsoft.Json
-@using System.Net.Http.Headers
 @using UserDTO = Chat.Shared.Models.UserAndChatDTOS.UserDTO
 @using ChatDTO = Chat.Shared.Models.UserAndChatDTOS.ChatDTO
 @using MessageDTO = Chat.Shared.Models.UserAndChatDTOS.MessageDTO
 @inject NavigationManager NavigationManager
 @inject IJSRuntime _jsRuntime
 @inject HttpClient Http
+
 <PageTitle>Chat</PageTitle>
 <h3>SignalR Chat</h3>
+<div class="modal @ModalClass" tabindex="-1" role="dialog" style="display:@ModalDisplay">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Modal title</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="() => Close()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input @bind="messageToChange" class="form-control" placeholder="Enter message"/>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" @onclick="() => Close(true)">Save changes</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" @onclick="() => Close()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 @if (!isUserLogin)
 {
@@ -72,12 +90,21 @@ else if (!isChatChosen)
 }
 else
 {
-    <textarea style="width:100%; height: 500px;" @ref="TextAreaRef" disabled="disabled">
-    @foreach (var m in messages)
-    {
-        @(m.Content + "\n");
-    }
-</textarea>
+    <div style="width:100%;" @ref="TextAreaRef" disabled="disabled">
+        <div class="text-lg-start" @onmouseover="() => showChange=true" @onmouseout="() => showChange=false">
+            @foreach (var m in messages)
+            {
+                <div class="d-flex justify-content-between">
+                    <p>@(m.Content)</p>
+                    <div class="d-flex justify-content-between gap-2">
+                        <p class = "@(showChange ? "visible" : "invisible")"
+                           @onclick="() => { Open(); changingMessage=m.Content;}">Change</p>
+                        <p class = "@(showChange ? "visible" : "invisible")">Delete</p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
     <div class="input-group">
         <input @bind="message"
                @onkeyup="HandleInput"
@@ -92,12 +119,17 @@ else
 
 @code{
     private HubConnection? hubConnection;
-    private List<MessageDTO> messages = new List<MessageDTO>();
+    private List<MessageDTO> messages = new ();
     private ChatDTO chat = new ();
     private UserDTO user = new ();
     private List<ChatDTO> chats = new();
     private List<UserDTO> users = new();
     private string message = String.Empty;
+    private bool showChange = false;
+    private bool showModal = false;
+    private string messageToChange = String.Empty;
+    private string changingMessage = String.Empty;
+    private bool isChanged = false;
     ElementReference TextAreaRef;
 
     private async Task Connect(UserDTO u = null, bool isChatPrivate = true)
@@ -161,7 +193,7 @@ else
     {
         if (hubConnection != null)
         {
-            await hubConnection.SendAsync("AddMessage", user.Name, message);
+           await hubConnection.SendAsync("AddMessage", user.Name, message);
             message = String.Empty;
         }
     }
@@ -201,6 +233,50 @@ else
         {
             ChooseUser();
         }
+    }
+
+    private void ChangeMessage(string msg)
+    {
+        foreach (var m in messages)
+        {
+            if (m.Content == msg)
+            {
+                m.Content = messageToChange;
+            }
+        }
+    }
+
+    private void Save(string msg = "")
+    {
+        if (msg is not null)
+        {
+            ChangeMessage(msg);
+        }
+    }
+    
+    public Guid Guid = Guid.NewGuid();
+    public string ModalDisplay = "none;";
+    public string ModalClass = "";
+    public bool ShowBackdrop = false;
+
+    public void Open()
+    {
+        ModalDisplay = "block;";
+        ModalClass = "Show";
+        ShowBackdrop = true;
+        StateHasChanged();
+    }
+
+    public void Close(bool change = false)
+    {
+        if (change)
+        {
+            Save(changingMessage); 
+        }
+        ModalDisplay = "none";
+        ModalClass = "";
+        ShowBackdrop = false;
+        StateHasChanged();
     }
 
 }
