@@ -62,7 +62,16 @@ namespace Chat.Server.Controllers
                 User = m.User.Id, DateCreated = m.DateCreated, PreviousMessage = string.Empty
             }).ToList();
 
-            return Ok(messagesToReturn.OrderByDescending(m=> m.DateCreated).ToList());
+            return Ok(messagesToReturn.OrderBy(m=> m.DateCreated).ToList());
+        }
+
+        [HttpDelete("{messageId}")]
+        public async Task<IActionResult> DeleteMessage(int messageId)
+        {
+            _context.Messages.Remove(await _context.Messages.FirstOrDefaultAsync(m => m.Id == messageId));
+            await _context.SaveChangesAsync();
+
+            return Ok();
         }
     }
 }

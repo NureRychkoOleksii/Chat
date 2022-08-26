@@ -99,7 +99,7 @@ else
                     <div class="d-flex justify-content-between gap-2">
                         <div class = "@(showChange ? "visible" : "invisible") btn btn-light"
                            @onclick="() => { Open(); changingMessage=m.Content; changedMessage = m.Content;}">Change</div>
-                        <div class = "@(showChange ? "visible" : "invisible") btn btn-light">Delete</div>
+                        <div class = "@(showChange ? "visible" : "invisible") btn btn-light" @onclick="async () => await Delete(m)">Delete</div>
                     </div>
                 </div>
             }
@@ -210,6 +210,14 @@ else
             message.Content = String.Empty;
         }
     }
+
+    private async Task Delete(MessageDTO message)
+    {
+        await Http.DeleteAsync($"api/message/{message.Id}");
+        messages.Remove(message);
+        StateHasChanged();
+    }
+    
     private bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
     private bool isUserLogin = false;
     private bool isChatChosen = false;
