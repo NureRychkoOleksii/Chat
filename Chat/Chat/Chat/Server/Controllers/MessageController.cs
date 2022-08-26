@@ -49,5 +49,20 @@ namespace Chat.Server.Controllers
             
             return Ok();
         }
+
+        [HttpGet("{chatId}")]
+        public async Task<IActionResult> GetMessagesFromChat(int chatId)
+        {
+            var messages = await _context.Messages.Include(m =>m.Chat)
+                .Include(m=>m.User).Where(m => m.Chat.Id == chatId).ToListAsync();
+
+            var messagesToReturn = messages.Select(m => new MessageDTO()
+            {
+                Content = m.Content, Chat = m.Chat.Id, Id = m.Id,
+                User = m.User.Id, DateCreated = m.DateCreated, PreviousMessage = string.Empty
+            }).ToList();
+
+            return Ok(messagesToReturn.OrderByDescending(m=> m.DateCreated).ToList());
+        }
     }
 }
