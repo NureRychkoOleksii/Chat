@@ -24,7 +24,8 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-primary" @onclick="() => Close(true)">Save changes</button>
-                <button type="button" class="btn btn-secondary" data-dismiss="modal" @onclick="() => Close()">Close</button>
+                <button type="button" class="btn btn-secondary"
+                        data-dismiss="modal" @onclick="() => Close()">Close</button>
             </div>
         </div>
     </div>
@@ -97,12 +98,23 @@ else
                 <div class="d-flex justify-content-between">
                     <div class="align-self-center">@(m.Content)</div>
                     <div class="d-flex justify-content-between gap-2">
-                        <div class = "@(showChange ? "visible" : "invisible") btn btn-light"
-                           @onclick="() => { Open(); changingMessage=m.Content; changedMessage = m.Content;}">Change</div>
-                        <div class = "@(showChange ? "visible" : "invisible") btn btn-light" @onclick="async () => await Delete(m)">Delete</div>
+                        <div class="@(showChange ? "visible" : "invisible") btn btn-light"
+                             @onclick="() => { Open(); changingMessage = m.Content; changedMessage = m.Content;}">
+                            Change
+                        </div>
+                        <div class = "@(showChange ? "visible" : "invisible") btn btn-light" 
+                             @onclick="async () => await Delete(m)">Delete</div>
                     </div>
                 </div>
             }
+            <div class="d-flex justify-content-between px-5">
+                <div class="btn btn-link"
+                     @onclick="async () => {if (page > 0){ page--; } await NextPage();}">Previous</div>
+                <div class="btn btn-link" 
+                     @onclick="async () => {if ((page+1) * 20 <= maxPage){ page++; } await NextPage(); }">
+                    Next
+                </div>
+            </div>
         </div>
     </div>
     <div class="input-group">
@@ -130,6 +142,8 @@ else
     private string messageToChange = String.Empty;
     private string changingMessage = String.Empty;
     private string changedMessage = String.Empty;
+    private int maxPage = 0;
+    private int page = 0;
     private bool isChanged = false;
     ElementReference TextAreaRef;
 
@@ -173,11 +187,20 @@ else
         isChatChosen = true;
         await hubConnection.StartAsync();
         messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+        maxPage = messages.Count();
+        messages = messages.Skip(page * 20).Take(20).ToList();
         message = new MessageDTO() {Chat = chat.Id, Content = String.Empty, User = user.Id};
 
     }
 
-     private async Task ChooseChat(UserDTO u)
+    private async Task NextPage()
+    {
+        var tempMessages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+
+        messages = tempMessages.Skip(page*20).Take(20).ToList();
+    }
+
+    private async Task ChooseChat(UserDTO u)
      {
          if (chats.Any(ch => ch.ChatName.Contains(u.Name) && ch.ChatName.Contains(user.Name)))
          {
