@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Chat.Shared.Models;
+using Chat.Shared.Models.UserAndChatDTOS;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -67,7 +68,8 @@ namespace Chat.Server.Controllers
             await _context.Chats.AddAsync(chatToCreate);
             await _context.SaveChangesAsync();
 
-            return Ok();
+            return Ok(new ChatDTO(){ChatName = chatToCreate.ChatName, Id=chatToCreate.Id,
+                IsPrivate = chatToCreate.IsPrivate, UsersId = chatToCreate.Users.Select(u => u.Id).ToList()});
         }
 
         [HttpPut("addUser")]

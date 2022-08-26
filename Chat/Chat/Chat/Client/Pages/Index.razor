@@ -106,7 +106,7 @@ else
         </div>
     </div>
     <div class="input-group">
-        <input @bind="message"
+        <input @bind="message.Content"
                @onkeyup="HandleInput"
                class="form-control"/>
         <button class="btn btn-primary form-group-append"
@@ -124,7 +124,7 @@ else
     private UserDTO user = new ();
     private List<ChatDTO> chats = new();
     private List<UserDTO> users = new();
-    private string message = String.Empty;
+    private MessageDTO message = new();
     private bool showChange = false;
     private bool showModal = false;
     private string messageToChange = String.Empty;
@@ -139,12 +139,15 @@ else
                 .WithUrl(NavigationManager.ToAbsoluteUri($"/privatechathub?username={user.Name}"))
                 .Build();
 
-            hubConnection.On<string, string>("ReceiveMessage", async (user, message) =>
+            hubConnection.On<string,MessageDTO>("ReceiveMessage", async (user, message) =>
             {
-                var actualMessage = $"{(string.IsNullOrEmpty(user) ? "" : user + ": ")}{message}";
+                var actualMessage = $"{(string.IsNullOrEmpty(user) ? "" : user + ": ")}{message.Content}";
                 var msg = new MessageDTO()
                 {Content = actualMessage, User = this.user.Id, Chat = chat.Id};
-                messages.Add(msg);
+                if(message.Chat == chat.Id)
+                {
+                    messages.Add(msg);
+                }
                 StateHasChanged();
                 var messageToApi = new MessageTOApiDTO()
                 {
@@ -158,7 +161,7 @@ else
 
         if (isChatPrivate)
         {
-            chat.ChatName = $"{user.Name}And{u.Name}";
+
             await ChooseChat(u);
         }
         
@@ -170,19 +173,21 @@ else
         isChatChosen = true;
         await hubConnection.StartAsync();
         messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
-        
+        message = new MessageDTO() {Chat = chat.Id, Content = String.Empty, User = user.Id};
+
     }
 
      private async Task ChooseChat(UserDTO u)
      {
-         if (chats.Any(ch => ch.ChatName == chat.ChatName))
+         if (chats.Any(ch => ch.ChatName.Contains(u.Name) && ch.ChatName.Contains(user.Name)))
          {
-             chat = chats.FirstOrDefault(ch => ch.ChatName == chat.ChatName);
+             chat = chats.FirstOrDefault(ch => ch.ChatName.Contains(u.Name) && ch.ChatName.Contains(user.Name));
              return;
          }
 
-         await Http.PostAsJsonAsync("api/chats",
+         var tempChat = await Http.PostAsJsonAsync("api/chats",
              new ChatToApiDTO() {ChatName = chat.ChatName, FirstUserName = user.Name, SecondUserName = u.Name});
+         chat = await tempChat.Content.ReadFromJsonAsync<ChatDTO>();
      }
 
     private async Task AddUserToChat(string chatName)
@@ -201,8 +206,8 @@ else
     {
         if (hubConnection != null)
         {
-           await hubConnection.SendAsync("AddMessage", user.Name, message);
-            message = String.Empty;
+            await hubConnection.SendAsync("AddMessage", user.Name, message);
+            message.Content = String.Empty;
         }
     }
     private bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
