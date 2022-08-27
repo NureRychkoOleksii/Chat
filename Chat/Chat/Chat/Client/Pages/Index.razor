@@ -14,7 +14,7 @@
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Modal title</h5>
+                <h5 class="modal-title">Change message</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="() => Close()">
                     <span aria-hidden="true">&times;</span>
                 </button>
@@ -31,12 +31,37 @@
     </div>
 </div>
 
+<div class="modal @ModalDeleteClass" tabindex="-1" role="dialog" style="display:@ModalDeleteDisplay">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete message</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="CloseDelete">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body d-flex justify-content-center">
+                <div class="btn btn-primary" @onclick="() => Delete(messageToDelete)">
+                    Delete for everyone
+                </div>
+                <div class="btn btn-primary" @onclick="() => Delete(messageToDelete, false)">
+                    Delete only for you
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary"
+                        data-dismiss="modal" @onclick="CloseDelete">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @if (!isUserLogin)
 {
     <div class="input-group">
         <input @bind="user.Name" class="form-control" @onkeyup="HandleConnection" placeholder="Enter your name"/>
         <button class="btn btn-primary form-control-append" 
-                @onclick="ChooseUser">Login</button>
+                @onclick="async () => await ChooseUser()">Login</button>
     </div>
 }
 else if (!isChatChosen)
@@ -95,6 +120,10 @@ else
         <div class="text-lg-start" @onmouseover="() => showChange=true" @onmouseout="() => showChange=false">
             @foreach (var m in messages)
             {
+                if (!m.isVisibleForUser && m.User == user.Id)
+                {
+                    break;
+                }
                 <div class="d-flex justify-content-between">
                     <div class="align-self-center">@(m.Content)</div>
                     <div class="d-flex justify-content-between gap-2">
@@ -103,7 +132,7 @@ else
                             Change
                         </div>
                         <div class = "@(showChange ? "visible" : "invisible") btn btn-light" 
-                             @onclick="async () => await Delete(m)">Delete</div>
+                             @onclick="() => { messageToDelete = m; OpenDelete(); }">Delete</div>
                     </div>
                 </div>
             }
@@ -142,6 +171,7 @@ else
     private string messageToChange = String.Empty;
     private string changingMessage = String.Empty;
     private string changedMessage = String.Empty;
+    private MessageDTO messageToDelete = new MessageDTO();
     private int maxPage = 0;
     private int page = 0;
     private bool isChanged = false;
@@ -167,7 +197,8 @@ else
                 {
                     Content = msg.Content,
                     Chat = chat.ChatName,
-                    User = this.user.Name
+                    User = this.user.Name,
+                    isVisibleForUser = true
                 };
                 await Http.PostAsJsonAsync("api/message", messageToApi);
                 await _jsRuntime.InvokeVoidAsync("scrollToBottom", TextAreaRef);
@@ -234,11 +265,37 @@ else
         }
     }
 
-    private async Task Delete(MessageDTO message)
+    private async Task Delete(MessageDTO message, bool forEveryone = true)
     {
-        await Http.DeleteAsync($"api/message/{message.Id}");
-        messages.Remove(message);
-        StateHasChanged();
+        if (message.User != user.Id)
+        {
+            await _jsRuntime.InvokeVoidAsync("alert", "You can't delete messages from another user!");
+        }
+        else if (forEveryone)
+        {
+            await Http.DeleteAsync($"api/message/{message.Id}");
+            messages.Remove(message);
+            StateHasChanged();
+            CloseDelete();
+        }
+        else
+        {
+            var msg = new MessageDTO()
+            {
+                Chat = chat.Id,
+                PreviousMessage = "",
+                User = message.User,
+                Content = message.Content,
+                DateCreated = message.DateCreated,
+                isVisibleForUser = false,
+                Id = message.Id
+            };
+            await Http.PutAsJsonAsync("api/message/deleteForUser", msg);
+            var tempMessage = messages.FirstOrDefault(m => m.Id == message.Id);
+            tempMessage.isVisibleForUser = false;
+            StateHasChanged();
+            CloseDelete();
+        }
     }
     
     private bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
@@ -258,8 +315,13 @@ else
         chats = await Http.GetFromJsonAsync<List<ChatDTO>>("api/chats");
     }
 
-    private void ChooseUser()
+    private async Task ChooseUser()
     {
+        if (!users.Any(u => u.Name == user.Name))
+        {
+            await _jsRuntime.InvokeVoidAsync("alert", "There is no such user!");
+            return;
+        }
         user = users.FirstOrDefault(u => u.Name == user.Name);
         isUserLogin = true;
     }
@@ -298,13 +360,34 @@ else
         }
        await Http.PutAsJsonAsync("api/message/changeMessage", new MessageDTO()
        {Chat = chat.Id, PreviousMessage = messageToChange,
-           User = user.Id, Content = changedMessage, DateCreated = DateTime.Now});
+           User = user.Id, Content = changedMessage, DateCreated = DateTime.Now, isVisibleForUser = true});
     }
     
     public Guid Guid = Guid.NewGuid();
     public string ModalDisplay = "none;";
     public string ModalClass = "";
+
+    public string ModalDeleteClass = "";
+    public string ModalDeleteDisplay = "none;";
+    public bool ShowDeleteBackdrop = false;
+    
     public bool ShowBackdrop = false;
+
+    public void OpenDelete()
+    {
+        ModalDeleteDisplay = "block;";
+        ModalDeleteClass = "Show";
+        ShowDeleteBackdrop = true;
+        StateHasChanged();
+    }
+
+    public void CloseDelete()
+    {
+        ModalDeleteDisplay = "none;";
+        ModalDeleteClass = "";
+        ShowDeleteBackdrop = false;
+        StateHasChanged();
+    }
 
     public void Open()
     {

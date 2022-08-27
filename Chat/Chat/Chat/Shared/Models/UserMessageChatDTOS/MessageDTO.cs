@@ -11,4 +11,6 @@ public class MessageDTO : BaseEntity
     public int Chat { get; set; }
     
     public DateTime DateCreated { get; set; }
+
+    public bool isVisibleForUser { get; set; } = true;
 }

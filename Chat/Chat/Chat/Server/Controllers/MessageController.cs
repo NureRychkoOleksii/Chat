@@ -50,6 +50,21 @@ namespace Chat.Server.Controllers
             return Ok();
         }
 
+        [HttpPut("deleteForUser")]
+        public async Task<IActionResult> DeleteMessage([FromBody]MessageDTO message)
+        {
+            var messageToUpdate = await
+                _context.Messages.FirstOrDefaultAsync(m =>
+                    m.User.Id == message.User && message.Content == m.Content);
+
+            messageToUpdate.isVisibleForUser = message.isVisibleForUser;
+        
+            _context.Messages.Update(messageToUpdate);
+            await _context.SaveChangesAsync();
+        
+            return Ok();
+        }
+
         [HttpGet("{chatId}")]
         public async Task<IActionResult> GetMessagesFromChat(int chatId)
         {
