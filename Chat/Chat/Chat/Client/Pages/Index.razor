@@ -1,6 +1,7 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.SignalR.Client
 @using Chat.Shared.Models
+@using Microsoft.CodeAnalysis.CSharp.Syntax
 @using UserDTO = Chat.Shared.Models.UserAndChatDTOS.UserDTO
 @using ChatDTO = Chat.Shared.Models.UserAndChatDTOS.ChatDTO
 @using MessageDTO = Chat.Shared.Models.UserAndChatDTOS.MessageDTO
@@ -40,7 +41,7 @@
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
-            <div class="modal-body d-flex justify-content-center">
+            <div class="modal-body d-flex justify-content-between">
                 <div class="btn btn-primary" @onclick="() => Delete(messageToDelete)">
                     Delete for everyone
                 </div>
@@ -128,7 +129,7 @@ else
                     <div class="align-self-center">@(m.Content)</div>
                     <div class="d-flex justify-content-between gap-2">
                         <div class="@(showChange ? "visible" : "invisible") btn btn-light"
-                             @onclick="() => { Open(); changingMessage = m.Content; changedMessage = m.Content;}">
+                             @onclick="async () => await DetermineChange(m)">
                             Change
                         </div>
                         <div class = "@(showChange ? "visible" : "invisible") btn btn-light" 
@@ -137,16 +138,16 @@ else
                 </div>
             }
             <div class="d-flex justify-content-between px-5">
-                <div class="btn btn-link"
+                <div class="btn btn-secondary"
                      @onclick="async () => {if (page > 0){ page--; } await NextPage();}">Previous</div>
-                <div class="btn btn-link" 
+                <div class="btn btn-secondary" 
                      @onclick="async () => {if ((page+1) * 20 <= maxPage){ page++; } await NextPage(); }">
                     Next
                 </div>
             </div>
         </div>
     </div>
-    <div class="input-group">
+    <div class="input-group py-2">
         <input @bind="message.Content"
                @onkeyup="HandleInput"
                class="form-control"/>
@@ -185,23 +186,33 @@ else
 
             hubConnection.On<string,MessageDTO>("ReceiveMessage", async (user, message) =>
             {
-                var actualMessage = $"{(string.IsNullOrEmpty(user) ? "" : user + ": ")}{message.Content}";
-                var msg = new MessageDTO()
-                {Content = actualMessage, User = this.user.Id, Chat = chat.Id};
-                if(message.Chat == chat.Id)
+                if (message.Content == String.Empty)
                 {
-                    messages.Add(msg);
+                    _jsRuntime.InvokeVoidAsync("alert", "Write some message :)");
                 }
-                StateHasChanged();
-                var messageToApi = new MessageTOApiDTO()
+                else
                 {
-                    Content = msg.Content,
-                    Chat = chat.ChatName,
-                    User = this.user.Name,
-                    isVisibleForUser = true
-                };
-                await Http.PostAsJsonAsync("api/message", messageToApi);
-                await _jsRuntime.InvokeVoidAsync("scrollToBottom", TextAreaRef);
+                    var actualMessage = $"{(string.IsNullOrEmpty(user) ? "" : user + ": ")}{message.Content}";
+                    var msg = new MessageDTO()
+                    {Content = actualMessage, User = this.user.Id, Chat = chat.Id};
+                    if (message.Chat == chat.Id)
+                    {
+                        messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+                        page += messages.Count / 20;
+                        messages.Add(msg);
+                        messages = messages.Skip(page * 20).Take(20).ToList();
+                    }
+                    StateHasChanged();
+                    var messageToApi = new MessageTOApiDTO()
+                    {
+                        Content = msg.Content,
+                        Chat = chat.ChatName,
+                        User = this.user.Name,
+                        isVisibleForUser = true
+                    };
+                    await Http.PostAsJsonAsync("api/message", messageToApi);
+                    await _jsRuntime.InvokeVoidAsync("scrollToBottom", TextAreaRef);
+                }
             });
 
         if (isChatPrivate)
@@ -349,6 +360,19 @@ else
             {
                 m.Content = messageToChange;
             }
+        }
+    }
+
+    private async Task DetermineChange(MessageDTO message)
+    {
+        if (message.User == user.Id)
+        {
+            Open();
+            changingMessage = message.Content; changedMessage = message.Content;
+        }
+        else
+        {
+            await _jsRuntime.InvokeVoidAsync("alert", "You can't change someone's messages!");
         }
     }
 
