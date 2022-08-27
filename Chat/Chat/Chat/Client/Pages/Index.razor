@@ -1,7 +1,6 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.SignalR.Client
 @using Chat.Shared.Models
-@using Microsoft.CodeAnalysis.CSharp.Syntax
 @using UserDTO = Chat.Shared.Models.UserAndChatDTOS.UserDTO
 @using ChatDTO = Chat.Shared.Models.UserAndChatDTOS.ChatDTO
 @using MessageDTO = Chat.Shared.Models.UserAndChatDTOS.MessageDTO
@@ -133,11 +132,11 @@ else
                         </div>
                     </div>
                     <div class="d-flex justify-content-between gap-2">
-                        <div class="@(showChange ? "visible" : "invisible") btn btn-light"
+                        <div class="@(showChange && m.User == user.Id ? "visible" : "invisible") btn btn-light"
                              @onclick="async () => await DetermineChange(m)">
                             Change
                         </div>
-                        <div class="@(showChange ? "visible" : "invisible") btn btn-light"
+                        <div class="@(showChange && m.User == user.Id ? "visible" : "invisible") btn btn-light"
                              @onclick="() => { messageToDelete = m; OpenDelete(); }">Delete</div>
                     </div>
                 </div>
@@ -210,7 +209,7 @@ else
                     StateHasChanged();
                     var messageToApi = new MessageTOApiDTO()
                     {
-                        Content = msg.Content,
+                        Content = message.Content,
                         Chat = chat.ChatName,
                         User = this.user.Name,
                         isVisibleForUser = true
@@ -368,7 +367,7 @@ else
         {
             if (m.Content == msg)
             {
-                m.Content = messageToChange;
+                m.Content = user.Name + ": " + messageToChange;
             }
         }
     }
@@ -394,7 +393,7 @@ else
         }
        await Http.PutAsJsonAsync("api/message/changeMessage", new MessageDTO()
        {Chat = chat.Id, PreviousMessage = messageToChange,
-           User = user.Id, Content = changedMessage, DateCreated = DateTime.Now, isVisibleForUser = true});
+           User = user.Id, Content = user.Name + ": " + changedMessage, DateCreated = DateTime.Now, isVisibleForUser = true});
     }
     
     public Guid Guid = Guid.NewGuid();
