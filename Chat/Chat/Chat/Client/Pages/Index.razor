@@ -237,18 +237,7 @@ else
                     var actualMessage = $"{(string.IsNullOrEmpty(user) ? "" : user + ": ")}{message.Content}";
                     var tempUser = users.FirstOrDefault(u => u.Name == user);
                     var msg = new MessageDTO()
-                    {Content = actualMessage, User = tempUser.Id, Chat = chat.Id, isVisibleForUser = true};
-                    if (message.Chat == chat.Id)
-                    {
-                        messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
-                        if (!(page + messages.Count / 20 > maxPage / 20))
-                        {
-                            page += messages.Count / 20;
-                        }
-                        messages.Add(msg);
-                        messages = messages.Skip(page * 20).Take(20).ToList();
-                    }
-                    StateHasChanged();
+                    {Content = actualMessage, User = tempUser.Id, Chat = chat.Id, isVisibleForUser = true, DateCreated = DateTime.Now};
                     var messageToApi = new MessageTOApiDTO()
                     {
                         Content = msg.Content,
@@ -259,6 +248,17 @@ else
                     if (messageToApi.User == this.user.Name)
                     {
                         await Http.PostAsJsonAsync("api/message", messageToApi);
+                    }
+                    if (message.Chat == chat.Id)
+                    {
+                        messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+                        if (!(page + messages.Count / 20 > maxPage / 20))
+                        {
+                            page += messages.Count / 20;
+                        }
+                        messages.Add(msg);
+                        messages = messages.Skip(page * 20).Take(20).ToList();
+                        StateHasChanged();
                     }
                     StateHasChanged();
                 }
