@@ -116,7 +116,7 @@ else if (!isChatChosen)
 }
 else
 {
-    <div s @ref="TextAreaRef" disabled="disabled" class="align-content-center align-self-center" style = "width: 100%;">
+    <div @ref="TextAreaRef" disabled="disabled" class="align-content-center align-self-center" style = "width: 100%;">
         <div class="d-flex flex-column">
             @foreach (var m in messages)
             {
@@ -131,6 +131,9 @@ else
                             <div class="align-self-center">@(m.Content)</div>
                             <div class="@(showChange && !chat.IsPrivate ? "" : "d-none") btn btn-warning btn-sm d-flex justify-content-center oi oi-share"
                                  @onclick="() => Reply(m)">
+                            </div>
+                            <div class="@(showChange && !chat.IsPrivate ? "" : "d-none") btn btn-warning btn-sm d-flex justify-content-center oi oi-arrow-left"
+                                 @onclick="() => Reply(m, true)">
                             </div>
                         </div>
                         <div class="d-flex justify-content-between gap-2">
@@ -369,8 +372,17 @@ else
         isUserLogin = true;
     }
 
-    private async Task Reply(MessageDTO messageDto)
+    private async Task Reply(MessageDTO messageDto, bool toUser = false)
     {
+        if (toUser)
+        {
+            chat = chats.FirstOrDefault(ch => ch.UsersId.Contains(user.Id) && ch.UsersId.Contains(messageDto.User) && ch.IsPrivate);
+            messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+            maxPage = messages.Count();
+            page = 0;
+            messages = messages.Skip(page * 20).Take(20).ToList();
+            message = new MessageDTO() {Chat = chat.Id, Content = String.Empty, User = user.Id};
+        }
         message.Content = $"In reply to {messageDto.Content}:";
     }
 

@@ -26,10 +26,10 @@ namespace Chat.Server.Controllers
         public async Task<IActionResult> GetChats()
         {
             var chatsAsync = await _context.Chats.Include(u => u.Users).ToListAsync();
-            var chats = new List<Shared.Models.UserAndChatDTOS.ChatDTO>();
+            var chats = new List<ChatDTO>();
             foreach (var ch in chatsAsync)
             {
-                chats.Add(new Shared.Models.UserAndChatDTOS.ChatDTO
+                chats.Add(new ChatDTO
                 {
                     IsPrivate = ch.IsPrivate, Id = ch.Id, ChatName = ch.ChatName,
                     UsersId = ch.Users.Select(u => u.Id).ToList()
@@ -43,10 +43,10 @@ namespace Chat.Server.Controllers
         public async Task<IActionResult> GetChatByName(string name)
         {
             var chatsAsync = await _context.Chats.ToListAsync();
-            var chats = new List<Shared.Models.UserAndChatDTOS.ChatDTO>();
+            var chats = new List<ChatDTO>();
             chatsAsync.ForEach(ch =>
             {
-                chats.Add(new Shared.Models.UserAndChatDTOS.ChatDTO()
+                chats.Add(new ChatDTO()
                     {Id = ch.Id, ChatName = ch.ChatName, UsersId = ch.Users.Select(u => u.Id).ToList()} );
             });
             return Ok(chats.FirstOrDefault(ch => ch.ChatName == name));
