@@ -145,10 +145,10 @@ else
                         <div class="d-flex @(m.User == user.Id ? "msg_container_send" : "msg_container") gap-2">
                             <div class="d-flex justify-content-between gap-2">
                                 <div class="align-self-center">@(m.Content)</div>
-                                <div class="@(showChange && !chat.IsPrivate ? "" : "d-none") btn btn-warning btn-sm d-flex justify-content-center oi oi-share"
+                                <div class="@(showChange && !chat.IsPrivate && m.User != user.Id ? "" : "d-none") btn btn-warning btn-sm d-flex justify-content-center oi oi-share"
                                      @onclick="() => Reply(m)">
                                 </div>
-                                <div class="@(showChange && !chat.IsPrivate ? "" : "d-none") btn btn-warning btn-sm d-flex justify-content-center oi oi-arrow-left"
+                                <div class="@(showChange && !chat.IsPrivate && m.User != user.Id ? "" : "d-none") btn btn-warning btn-sm d-flex justify-content-center oi oi-arrow-left"
                                      @onclick="() => Reply(m, true)">
                                 </div>
                             </div>
@@ -207,7 +207,7 @@ else
     private List<ChatDTO> chats = new();
     private List<UserDTO> users = new();
     private MessageDTO message = new();
-    private bool showChange = false;
+    private bool showChange = true;
     private bool showModal = false;
     private string messageToChange = String.Empty;
     private string changingMessage = String.Empty;
