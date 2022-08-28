@@ -139,26 +139,25 @@ else
         <div class="d-flex flex-column">
             @foreach (var m in messages)
             {
-                if (!m.isVisibleForUser && m.User == user.Id)
+                if (!(!m.isVisibleForUser && m.User == user.Id))
                 {
-                    continue;
-                }
-                <div class="d-flex @(m.User == user.Id ? "justify-content-end" : "justify-content-start") pb-2">
-                    <div class="d-flex @(m.User == user.Id ? "msg_container_send" : "msg_container") gap-2">
-                        <div class="d-flex justify-content-between gap-2">
-                            <div class="align-self-center">@(m.Content)</div>
-                            <div class="@(showChange && !chat.IsPrivate ? "" : "d-none") btn btn-warning btn-sm d-flex justify-content-center oi oi-share"
-                                 @onclick="() => Reply(m)">
+                    <div class="d-flex @(m.User == user.Id ? "justify-content-end" : "justify-content-start") pb-2">
+                        <div class="d-flex @(m.User == user.Id ? "msg_container_send" : "msg_container") gap-2">
+                            <div class="d-flex justify-content-between gap-2">
+                                <div class="align-self-center">@(m.Content)</div>
+                                <div class="@(showChange && !chat.IsPrivate ? "" : "d-none") btn btn-warning btn-sm d-flex justify-content-center oi oi-share"
+                                     @onclick="() => Reply(m)">
+                                </div>
+                                <div class="@(showChange && !chat.IsPrivate ? "" : "d-none") btn btn-warning btn-sm d-flex justify-content-center oi oi-arrow-left"
+                                     @onclick="() => Reply(m, true)">
+                                </div>
                             </div>
-                            <div class="@(showChange && !chat.IsPrivate ? "" : "d-none") btn btn-warning btn-sm d-flex justify-content-center oi oi-arrow-left"
-                                 @onclick="() => Reply(m, true)">
+                            <div class="@(m.User == user.Id ? "d-flex" : "d-none") justify-content-center oi oi-menu align-self-center top-0"
+                                 @onclick="() => { messageMain = m; OpenMain(); }">
                             </div>
-                        </div>
-                        <div class="@(m.User == user.Id ? "d-flex" : "d-none") justify-content-center oi oi-menu align-self-center top-0"
-                             @onclick="() => { messageMain = m; OpenMain(); }">
                         </div>
                     </div>
-                </div>
+                }
             }
             <div class="d-flex justify-content-between px-5">
                 <div class="btn btn-secondary"

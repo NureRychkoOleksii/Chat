@@ -39,8 +39,7 @@ namespace Chat.Server.Controllers
         public async Task<IActionResult> ChangeMessage([FromBody]MessageDTO message)
         {
             var messageToUpdate = await
-                _context.Messages.FirstOrDefaultAsync(m =>
-                    m.User.Id == message.User && message.Content == m.Content && m.Id == message.Id);
+                _context.Messages.FirstOrDefaultAsync(m => m.Id == message.Id);
 
             messageToUpdate.Content = message.PreviousMessage;
             
@@ -55,7 +54,7 @@ namespace Chat.Server.Controllers
         {
             var messageToUpdate = await
                 _context.Messages.FirstOrDefaultAsync(m =>
-                    m.User.Id == message.User && message.Content == m.Content);
+                    m.Id == message.Id);
 
             messageToUpdate.isVisibleForUser = message.isVisibleForUser;
         
