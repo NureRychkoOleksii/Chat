@@ -24,5 +24,14 @@ public class ChatHub : Hub
     {
         await Clients.All.SendAsync("ReceiveMessage",user, message);
     }
-    
+
+    public async Task ChangeMessage(MessageDTO message)
+    {
+        await Clients.All.SendAsync("ReceiveEditedMessage", message);
+    }
+
+    public async Task DeleteMessage(MessageDTO message)
+    {
+        await Clients.All.SendAsync("DeletedMessage", message);
+    }
 }

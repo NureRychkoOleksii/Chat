@@ -56,6 +56,25 @@
     </div>
 </div>
 
+<div class="modal @ModalMainClass" tabindex="-1" role="dialog" style="display:@ModalMainDisplay">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-footer justify-content-center">
+                <div class="d-flex justify-content-between gap-2">
+                    <div class="btn btn-light oi oi-pencil"
+                         @onclick="async () => { CloseMain(); await DetermineChange(messageMain); }">
+                    </div>
+                    <div class="btn btn-light oi oi-trash"
+                         @onclick="() => { CloseMain(); messageToDelete = messageMain; OpenDelete(); }"></div>
+                </div>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="CloseMain">
+                                <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @if (!isUserLogin)
 {
     <div class="input-group">
@@ -124,8 +143,7 @@ else
                 {
                     continue;
                 }
-                <div class="d-flex @(m.User == user.Id ? "justify-content-end" : "justify-content-start")" @onmouseover="() => showChange = true"
-                     @onmouseout="() => showChange = false">
+                <div class="d-flex @(m.User == user.Id ? "justify-content-end" : "justify-content-start") pb-2">
                     <div class="d-flex @(m.User == user.Id ? "msg_container_send" : "msg_container") gap-2">
                         <div class="d-flex justify-content-between gap-2">
                             <div class="align-self-center">@(m.Content)</div>
@@ -136,12 +154,8 @@ else
                                  @onclick="() => Reply(m, true)">
                             </div>
                         </div>
-                        <div class="d-flex justify-content-between gap-2">
-                            <div class="@(showChange && m.User == user.Id ? "" : "d-none") btn btn-light oi oi-pencil"
-                                 @onclick="async () => await DetermineChange(m)">
-                            </div>
-                            <div class="@(showChange && m.User == user.Id ? "" : "d-none") btn btn-light oi oi-trash"
-                                 @onclick="() => { messageToDelete = m; OpenDelete(); }"></div>
+                        <div class="@(m.User == user.Id ? "d-flex" : "d-none") justify-content-center oi oi-menu align-self-center top-0"
+                             @onclick="() => { messageMain = m; OpenMain(); }">
                         </div>
                     </div>
                 </div>
@@ -198,12 +212,13 @@ else
     private bool showModal = false;
     private string messageToChange = String.Empty;
     private string changingMessage = String.Empty;
-    private string changedMessage = String.Empty;
+    private MessageDTO changedMessage = new();
     private MessageDTO messageToDelete = new MessageDTO();
     private int maxPage = 0;
     private int page = 0;
     private bool isChanged = false;
     ElementReference TextAreaRef;
+    private MessageDTO messageMain = new();
 
     private async Task Connect(UserDTO u = null, bool isChatPrivate = true)
     {
@@ -248,6 +263,25 @@ else
                     StateHasChanged();
                 }
             });
+        hubConnection.On<MessageDTO>("ReceiveEditedMessage", async (message) =>
+        {
+            if (message.Chat == chat.Id)
+            {
+                var idx = messages.FindIndex(m => m.Id == message.Id);
+                messages[idx] = message;
+            }
+            
+            StateHasChanged();
+        });
+        hubConnection.On<MessageDTO>("DeletedMessage", async (message) =>
+        {
+            if (message.Chat == chat.Id)
+            {
+                messages.Remove(messages.FirstOrDefault(m => m.Id == message.Id));
+                StateHasChanged();
+            }
+            StateHasChanged();
+        });
 
         if (isChatPrivate)
         {
@@ -321,6 +355,10 @@ else
         {
             await Http.DeleteAsync($"api/message/{message.Id}");
             messages.Remove(message);
+            if (hubConnection is not null)
+            {
+                await hubConnection.SendAsync("DeleteMessage", message);
+            }
             StateHasChanged();
             CloseDelete();
         }
@@ -401,13 +439,17 @@ else
         }
     }
 
-    private void ChangeMessage(string msg)
+    private async Task ChangeMessage(string msg)
     {
         foreach (var m in messages)
         {
-            if (m.Content == msg)
+            if (m.Content == msg && m.Id == changedMessage.Id)
             {
                 m.Content = user.Name + ": " + messageToChange;
+                if (hubConnection is not null)
+                {
+                    await hubConnection.SendAsync("ChangeMessage", m);
+                }
             }
         }
     }
@@ -417,7 +459,9 @@ else
         if (message.User == user.Id)
         {
             Open();
-            changingMessage = message.Content; changedMessage = message.Content;
+            changingMessage = message.Content; 
+            changedMessage.Content = message.Content;
+            changedMessage.Id = message.Id;
         }
         else
         {
@@ -429,11 +473,15 @@ else
     {
         if (msg is not null)
         {
-            ChangeMessage(msg);
+            await ChangeMessage(msg);
         }
-       await Http.PutAsJsonAsync("api/message/changeMessage", new MessageDTO()
-       {Chat = chat.Id, PreviousMessage = messageToChange,
-           User = user.Id, Content = user.Name + ": " + changedMessage, DateCreated = DateTime.Now, isVisibleForUser = true});
+        var mess = new MessageDTO()
+        {
+            Id = changedMessage.Id,
+            Chat = chat.Id, PreviousMessage = user.Name + ": " + messageToChange,
+            User = user.Id, Content = changedMessage.Content, DateCreated = DateTime.Now, isVisibleForUser = true
+        };
+       await Http.PutAsJsonAsync("api/message/changeMessage", mess);
     }
     
     public Guid Guid = Guid.NewGuid();
@@ -444,8 +492,28 @@ else
     public string ModalDeleteDisplay = "none;";
     public bool ShowDeleteBackdrop = false;
     
+    public string ModalMainClass = "";
+    public string ModalMainDisplay = "none;";
+    public bool ShowMainBackdrop = false;
+    
     public bool ShowBackdrop = false;
 
+    public void OpenMain()
+    {
+        ModalMainClass = "Show";
+        ModalMainDisplay = "block;";
+        ShowMainBackdrop = true;
+        StateHasChanged();
+    }
+
+    public void CloseMain()
+    {
+        ModalMainClass = "";
+        ModalMainDisplay = "none;";
+        ShowMainBackdrop = false;
+        StateHasChanged();
+    }
+    
     public void OpenDelete()
     {
         ModalDeleteDisplay = "block;";

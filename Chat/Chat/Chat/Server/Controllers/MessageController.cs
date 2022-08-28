@@ -40,7 +40,7 @@ namespace Chat.Server.Controllers
         {
             var messageToUpdate = await
                 _context.Messages.FirstOrDefaultAsync(m =>
-                    m.User.Id == message.User && message.Content == m.Content);
+                    m.User.Id == message.User && message.Content == m.Content && m.Id == message.Id);
 
             messageToUpdate.Content = message.PreviousMessage;
             
