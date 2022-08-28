@@ -116,28 +116,30 @@ else if (!isChatChosen)
 }
 else
 {
-    <div style="width:100%;" @ref="TextAreaRef" disabled="disabled" class="align-content-center align-self-center">
-        <div class="text-lg-start" @onmouseover="() => showChange=true" @onmouseout="() => showChange=false">
+    <div s @ref="TextAreaRef" disabled="disabled" class="align-content-center align-self-center" style = "width: 100%;">
+        <div class="d-flex flex-column">
             @foreach (var m in messages)
             {
                 if (!m.isVisibleForUser && m.User == user.Id)
                 {
-                    break;
+                    continue;
                 }
-                <div class="d-flex justify-content-between">
-                    <div class="d-flex justify-content-between gap-2">
-                        <div class="align-self-center">@(m.Content)</div>
-                        <div class="@(showChange && !chat.IsPrivate ? "visible" : "invisible") btn btn-warning btn-sm d-flex justify-content-center" @onclick="() => Reply(m)">
-                            Reply
+                <div class="d-flex @(m.User == user.Id ? "justify-content-end" : "justify-content-start")" @onmouseover="() => showChange = true"
+                     @onmouseout="() => showChange = false">
+                    <div class="d-flex @(m.User == user.Id ? "msg_container_send" : "msg_container") gap-2">
+                        <div class="d-flex justify-content-between gap-2">
+                            <div class="align-self-center">@(m.Content)</div>
+                            <div class="@(showChange && !chat.IsPrivate ? "" : "d-none") btn btn-warning btn-sm d-flex justify-content-center oi oi-share"
+                                 @onclick="() => Reply(m)">
+                            </div>
                         </div>
-                    </div>
-                    <div class="d-flex justify-content-between gap-2">
-                        <div class="@(showChange && m.User == user.Id ? "visible" : "invisible") btn btn-light"
-                             @onclick="async () => await DetermineChange(m)">
-                            Change
+                        <div class="d-flex justify-content-between gap-2">
+                            <div class="@(showChange && m.User == user.Id ? "" : "d-none") btn btn-light oi oi-pencil"
+                                 @onclick="async () => await DetermineChange(m)">
+                            </div>
+                            <div class="@(showChange && m.User == user.Id ? "" : "d-none") btn btn-light oi oi-trash"
+                                 @onclick="() => { messageToDelete = m; OpenDelete(); }"></div>
                         </div>
-                        <div class="@(showChange && m.User == user.Id ? "visible" : "invisible") btn btn-light"
-                             @onclick="() => { messageToDelete = m; OpenDelete(); }">Delete</div>
                     </div>
                 </div>
             }
@@ -162,6 +164,24 @@ else
         </button>
     </div>
 }
+<style>
+    .msg_container{
+    		margin-top: auto;
+    		margin-bottom: auto;
+    		margin-left: 10px;
+    		border-radius: 25px;
+    		background-color: #82ccdd;
+    		padding: 10px;
+    	}
+    	.msg_container_send{
+    		margin-top: auto;
+    		margin-bottom: auto;
+    		margin-right: 10px;
+    		border-radius: 25px;
+    		background-color: #78e08f;
+    		padding: 10px;
+    	}
+</style>
 
 @code{
     private HubConnection? hubConnection;
@@ -197,25 +217,32 @@ else
                 else
                 {
                     var actualMessage = $"{(string.IsNullOrEmpty(user) ? "" : user + ": ")}{message.Content}";
+                    var tempUser = users.FirstOrDefault(u => u.Name == user);
                     var msg = new MessageDTO()
-                    {Content = actualMessage, User = this.user.Id, Chat = chat.Id};
+                    {Content = actualMessage, User = tempUser.Id, Chat = chat.Id, isVisibleForUser = true};
                     if (message.Chat == chat.Id)
                     {
                         messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
-                        page += messages.Count / 20;
+                        if (!(page + messages.Count / 20 > maxPage / 20))
+                        {
+                            page += messages.Count / 20;
+                        }
                         messages.Add(msg);
                         messages = messages.Skip(page * 20).Take(20).ToList();
                     }
                     StateHasChanged();
                     var messageToApi = new MessageTOApiDTO()
                     {
-                        Content = message.Content,
+                        Content = msg.Content,
                         Chat = chat.ChatName,
-                        User = this.user.Name,
+                        User = tempUser.Name,
                         isVisibleForUser = true
                     };
-                    await Http.PostAsJsonAsync("api/message", messageToApi);
-                    await _jsRuntime.InvokeVoidAsync("scrollToBottom", TextAreaRef);
+                    if (messageToApi.User == this.user.Name)
+                    {
+                        await Http.PostAsJsonAsync("api/message", messageToApi);
+                    }
+                    StateHasChanged();
                 }
             });
 
@@ -236,6 +263,7 @@ else
         maxPage = messages.Count();
         messages = messages.Skip(page * 20).Take(20).ToList();
         message = new MessageDTO() {Chat = chat.Id, Content = String.Empty, User = user.Id};
+        StateHasChanged();
 
     }
 

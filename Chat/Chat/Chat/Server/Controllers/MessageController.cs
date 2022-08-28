@@ -29,7 +29,7 @@ namespace Chat.Server.Controllers
             var chat = await _context.Chats.FirstOrDefaultAsync(ch => ch.ChatName == messageToApi.Chat);
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Name == messageToApi.User);
             await _context.Messages.AddAsync(new Message()
-                {Content = messageToApi.Content, Chat = chat, User = user, DateCreated = DateTime.Now});
+                {Content = messageToApi.Content, Chat = chat, User = user, DateCreated = DateTime.Now, isVisibleForUser = messageToApi.isVisibleForUser});
             await _context.SaveChangesAsync();
 
             return Ok();
@@ -74,7 +74,7 @@ namespace Chat.Server.Controllers
             var messagesToReturn = messages.Select(m => new MessageDTO()
             {
                 Content = m.Content, Chat = m.Chat.Id, Id = m.Id,
-                User = m.User.Id, DateCreated = m.DateCreated, PreviousMessage = string.Empty
+                User = m.User.Id, DateCreated = m.DateCreated, PreviousMessage = string.Empty, isVisibleForUser = m.isVisibleForUser
             }).ToList();
 
             return Ok(messagesToReturn.OrderBy(m=> m.DateCreated).ToList());
