@@ -83,7 +83,8 @@ namespace Chat.Server.Controllers
         [HttpDelete("{messageId}")]
         public async Task<IActionResult> DeleteMessage(int messageId)
         {
-            _context.Messages.Remove(await _context.Messages.FirstOrDefaultAsync(m => m.Id == messageId));
+            var message = _context.Messages.FirstOrDefault(m => m.Id == messageId);
+            _context.Messages.Remove(message);
             await _context.SaveChangesAsync();
 
             return Ok();

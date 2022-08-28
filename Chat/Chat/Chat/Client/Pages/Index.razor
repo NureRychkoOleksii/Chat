@@ -237,7 +237,7 @@ else
                     var actualMessage = $"{(string.IsNullOrEmpty(user) ? "" : user + ": ")}{message.Content}";
                     var tempUser = users.FirstOrDefault(u => u.Name == user);
                     var msg = new MessageDTO()
-                    {Content = actualMessage, User = tempUser.Id, Chat = chat.Id, isVisibleForUser = true, DateCreated = DateTime.Now};
+                    {Id = message.Id,Content = actualMessage, User = tempUser.Id, Chat = chat.Id, isVisibleForUser = true};
                     var messageToApi = new MessageTOApiDTO()
                     {
                         Content = msg.Content,
@@ -252,13 +252,15 @@ else
                     if (message.Chat == chat.Id)
                     {
                         messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
-                        if (!(page + messages.Count / 20 > maxPage / 20))
+                        if (page * 20 + messages.Count > maxPage)
                         {
-                            page += messages.Count / 20;
+                            page = messages.Count / 20;
                         }
-                        messages.Add(msg);
+                        if (this.user.Name != user)
+                        {
+                            messages.Add(msg);
+                        }
                         messages = messages.Skip(page * 20).Take(20).ToList();
-                        StateHasChanged();
                     }
                     StateHasChanged();
                 }
@@ -267,20 +269,19 @@ else
         {
             if (message.Chat == chat.Id)
             {
-                var idx = messages.FindIndex(m => m.Id == message.Id);
-                messages[idx] = message;
+                messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+                messages = messages.Skip(page * 20).Take(20).ToList();
+                StateHasChanged();
             }
-            
-            StateHasChanged();
         });
         hubConnection.On<MessageDTO>("DeletedMessage", async (message) =>
         {
             if (message.Chat == chat.Id)
             {
-                messages.Remove(messages.FirstOrDefault(m => m.Id == message.Id));
+                messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+                messages = messages.Skip(page * 20).Take(20).ToList();
                 StateHasChanged();
             }
-            StateHasChanged();
         });
 
         if (isChatPrivate)
@@ -354,7 +355,7 @@ else
         else if (forEveryone)
         {
             await Http.DeleteAsync($"api/message/{message.Id}");
-            messages.Remove(message);
+            messages.Remove(messages.FirstOrDefault(m => m.Id == message.Id));
             if (hubConnection is not null)
             {
                 await hubConnection.SendAsync("DeleteMessage", message);
@@ -380,6 +381,7 @@ else
             StateHasChanged();
             CloseDelete();
         }
+        StateHasChanged();
     }
     
     private bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
@@ -439,21 +441,6 @@ else
         }
     }
 
-    private async Task ChangeMessage(string msg)
-    {
-        foreach (var m in messages)
-        {
-            if (m.Content == msg && m.Id == changedMessage.Id)
-            {
-                m.Content = user.Name + ": " + messageToChange;
-                if (hubConnection is not null)
-                {
-                    await hubConnection.SendAsync("ChangeMessage", m);
-                }
-            }
-        }
-    }
-
     private async Task DetermineChange(MessageDTO message)
     {
         if (message.User == user.Id)
@@ -471,10 +458,6 @@ else
 
     private async Task Save(string msg = "")
     {
-        if (msg is not null)
-        {
-            await ChangeMessage(msg);
-        }
         var mess = new MessageDTO()
         {
             Id = changedMessage.Id,
@@ -482,6 +465,11 @@ else
             User = user.Id, Content = changedMessage.Content, DateCreated = DateTime.Now, isVisibleForUser = true
         };
        await Http.PutAsJsonAsync("api/message/changeMessage", mess);
+        
+       messages = messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+       messages = messages.Skip(page * 20).Take(20).ToList();
+       StateHasChanged();
+        await hubConnection.SendAsync("ChangeMessage", mess);
     }
     
     public Guid Guid = Guid.NewGuid();
