@@ -376,8 +376,11 @@ else
                 Id = message.Id
             };
             await Http.PutAsJsonAsync("api/message/deleteForUser", msg);
-            var tempMessage = messages.FirstOrDefault(m => m.Id == message.Id);
-            tempMessage.isVisibleForUser = false;
+            messages.Remove(messages.FirstOrDefault(m => m.Id == message.Id));
+            if (hubConnection is not null)
+            {
+                await hubConnection.SendAsync("DeleteMessage", message);
+            }
             StateHasChanged();
             CloseDelete();
         }
