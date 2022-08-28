@@ -1,0 +1,543 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.SignalR.Client
+@using Chat.Shared.Models
+@using UserDTO = Chat.Shared.Models.UserAndChatDTOS.UserDTO
+@using ChatDTO = Chat.Shared.Models.UserAndChatDTOS.ChatDTO
+@using MessageDTO = Chat.Shared.Models.UserAndChatDTOS.MessageDTO
+@inject NavigationManager NavigationManager
+@inject IJSRuntime _jsRuntime
+@inject HttpClient Http
+
+<PageTitle>Chat</PageTitle>
+<h3>SignalR Chat</h3>
+<div class="modal @ModalClass" tabindex="-1" role="dialog" style="display:@ModalDisplay">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Change message</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="() => Close()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input @bind="messageToChange" class="form-control" placeholder="Enter message"/>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" @onclick="() => Close(true)">Save changes</button>
+                <button type="button" class="btn btn-secondary"
+                        data-dismiss="modal" @onclick="() => Close()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal @ModalDeleteClass" tabindex="-1" role="dialog" style="display:@ModalDeleteDisplay">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete message</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="CloseDelete">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body d-flex justify-content-between">
+                <div class="btn btn-primary" @onclick="() => Delete(messageToDelete)">
+                    Delete for everyone
+                </div>
+                <div class="btn btn-primary" @onclick="() => Delete(messageToDelete, false)">
+                    Delete only for you
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary"
+                        data-dismiss="modal" @onclick="CloseDelete">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal @ModalMainClass" tabindex="-1" role="dialog" style="display:@ModalMainDisplay">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-footer justify-content-center">
+                <div class="d-flex justify-content-between gap-2">
+                    <div class="btn btn-light oi oi-pencil"
+                         @onclick="async () => { CloseMain(); await DetermineChange(messageMain); }">
+                    </div>
+                    <div class="btn btn-light oi oi-trash"
+                         @onclick="() => { CloseMain(); messageToDelete = messageMain; OpenDelete(); }"></div>
+                </div>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="CloseMain">
+                                <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!isUserLogin)
+{
+    <div class="input-group">
+        <input @bind="user.Name" class="form-control" @onkeyup="HandleConnection" placeholder="Enter your name"/>
+        <button class="btn btn-primary form-control-append" 
+                @onclick="async () => await ChooseUser()">Login</button>
+    </div>
+}
+else if (!isChatChosen)
+{
+    <div class="row justify-content-center">
+        <div class="col-auto">
+            <div class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Connect</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in users)
+                    {
+                        @if (u.Id == user.Id)
+                        {
+                            continue;
+                        }
+                        
+                        <tr>
+                            <th scope="row">@u.Id</th>
+                            <th>@u.Name</th>
+                            <th>
+                                <button class="btn btn-primary" @onclick="() => Connect(u)">Connect</button>
+                            </th>
+                        </tr>
+                    }
+                @foreach (var ch in chats)
+                {
+                    if (!ch.IsPrivate)
+                    {
+                        <tr>
+                            <th scope="row">@ch.Id</th>
+                            <th>@ch.ChatName</th>
+                            <th>
+                                <button 
+                                    class="btn btn-primary" 
+                                    @onclick="() => { 
+                                    chat.ChatName = ch.ChatName;
+                                    Connect(isChatPrivate: false); }">Connect</button>
+                            </th>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </div>
+            </div>
+    </div>
+}
+else
+{
+    <div @ref="TextAreaRef" disabled="disabled" class="align-content-center align-self-center" style = "width: 100%;">
+        <div class="d-flex flex-column">
+            @foreach (var m in messages)
+            {
+                if (!(!m.isVisibleForUser && m.User == user.Id))
+                {
+                    <div class="d-flex @(m.User == user.Id ? "justify-content-end" : "justify-content-start") pb-2">
+                        <div class="d-flex @(m.User == user.Id ? "msg_container_send" : "msg_container") gap-2">
+                            <div class="d-flex justify-content-between gap-2">
+                                <div class="align-self-center">@(m.Content)</div>
+                                <div class="@(showChange && !chat.IsPrivate ? "" : "d-none") btn btn-warning btn-sm d-flex justify-content-center oi oi-share"
+                                     @onclick="() => Reply(m)">
+                                </div>
+                                <div class="@(showChange && !chat.IsPrivate ? "" : "d-none") btn btn-warning btn-sm d-flex justify-content-center oi oi-arrow-left"
+                                     @onclick="() => Reply(m, true)">
+                                </div>
+                            </div>
+                            <div class="@(m.User == user.Id ? "d-flex" : "d-none") justify-content-center oi oi-menu align-self-center top-0"
+                                 @onclick="() => { messageMain = m; OpenMain(); }">
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            <div class="d-flex justify-content-between px-5">
+                <div class="btn btn-secondary"
+                     @onclick="async () => {if (page > 0){ page--; } await NextPage();}">Previous</div>
+                <div class="btn btn-secondary" 
+                     @onclick="async () => {if ((page+1) * 20 <= maxPage){ page++; } await NextPage(); }">
+                    Next
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="input-group py-2">
+        <input @bind="message.Content"
+               @onkeyup="HandleInput"
+               class="form-control"/>
+        <button class="btn btn-primary form-group-append"
+                @onclick="Send"
+                disabled="@(!IsConnected)">
+            Send
+        </button>
+    </div>
+}
+<style>
+    .msg_container{
+    		margin-top: auto;
+    		margin-bottom: auto;
+    		margin-left: 10px;
+    		border-radius: 25px;
+    		background-color: #82ccdd;
+    		padding: 10px;
+    	}
+    	.msg_container_send{
+    		margin-top: auto;
+    		margin-bottom: auto;
+    		margin-right: 10px;
+    		border-radius: 25px;
+    		background-color: #78e08f;
+    		padding: 10px;
+    	}
+</style>
+
+@code{
+    private HubConnection? hubConnection;
+    private List<MessageDTO> messages = new ();
+    private ChatDTO chat = new ();
+    private UserDTO user = new ();
+    private List<ChatDTO> chats = new();
+    private List<UserDTO> users = new();
+    private MessageDTO message = new();
+    private bool showChange = false;
+    private bool showModal = false;
+    private string messageToChange = String.Empty;
+    private string changingMessage = String.Empty;
+    private MessageDTO changedMessage = new();
+    private MessageDTO messageToDelete = new MessageDTO();
+    private int maxPage = 0;
+    private int page = 0;
+    private bool isChanged = false;
+    ElementReference TextAreaRef;
+    private MessageDTO messageMain = new();
+
+    private async Task Connect(UserDTO u = null, bool isChatPrivate = true)
+    {
+        hubConnection = new HubConnectionBuilder()
+                .WithUrl(NavigationManager.ToAbsoluteUri($"/privatechathub?username={user.Name}"))
+                .Build();
+
+            hubConnection.On<string,MessageDTO>("ReceiveMessage", async (user, message) =>
+            {
+                if (message.Content == String.Empty)
+                {
+                    _jsRuntime.InvokeVoidAsync("alert", "Write some message :)");
+                }
+                else
+                {
+                    var actualMessage = $"{(string.IsNullOrEmpty(user) ? "" : user + ": ")}{message.Content}";
+                    var tempUser = users.FirstOrDefault(u => u.Name == user);
+                    var msg = new MessageDTO()
+                    {Id = message.Id,Content = actualMessage, User = tempUser.Id, Chat = chat.Id, isVisibleForUser = true};
+                    var messageToApi = new MessageTOApiDTO()
+                    {
+                        Content = msg.Content,
+                        Chat = chat.ChatName,
+                        User = tempUser.Name,
+                        isVisibleForUser = true
+                    };
+                    if (messageToApi.User == this.user.Name)
+                    {
+                        await Http.PostAsJsonAsync("api/message", messageToApi);
+                    }
+                    if (message.Chat == chat.Id)
+                    {
+                        messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+                        if (page * 20 + messages.Count > maxPage)
+                        {
+                            page = messages.Count / 20;
+                        }
+                        if (this.user.Name != user)
+                        {
+                            messages.Add(msg);
+                        }
+                        messages = messages.Skip(page * 20).Take(20).ToList();
+                    }
+                    StateHasChanged();
+                }
+            });
+        hubConnection.On<MessageDTO>("ReceiveEditedMessage", async (message) =>
+        {
+            if (message.Chat == chat.Id)
+            {
+                messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+                messages = messages.Skip(page * 20).Take(20).ToList();
+                StateHasChanged();
+            }
+        });
+        hubConnection.On<MessageDTO>("DeletedMessage", async (message) =>
+        {
+            if (message.Chat == chat.Id)
+            {
+                messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+                messages = messages.Skip(page * 20).Take(20).ToList();
+                StateHasChanged();
+            }
+        });
+
+        if (isChatPrivate)
+        {
+
+            await ChooseChat(u);
+        }
+        
+        else
+        {
+            await AddUserToChat(chat.ChatName);
+        }
+        
+        isChatChosen = true;
+        await hubConnection.StartAsync();
+        messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+        maxPage = messages.Count();
+        messages = messages.Skip(page * 20).Take(20).ToList();
+        message = new MessageDTO() {Chat = chat.Id, Content = String.Empty, User = user.Id};
+        StateHasChanged();
+
+    }
+
+    private async Task NextPage()
+    {
+        var tempMessages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+
+        messages = tempMessages.Skip(page*20).Take(20).ToList();
+    }
+
+    private async Task ChooseChat(UserDTO u)
+     {
+         if (chats.Any(ch => ch.ChatName.Contains(u.Name) && ch.ChatName.Contains(user.Name)))
+         {
+             chat = chats.FirstOrDefault(ch => ch.ChatName.Contains(u.Name) && ch.ChatName.Contains(user.Name));
+             return;
+         }
+
+         var tempChat = await Http.PostAsJsonAsync("api/chats",
+             new ChatToApiDTO() {ChatName = chat.ChatName, FirstUserName = user.Name, SecondUserName = u.Name});
+         chat = await tempChat.Content.ReadFromJsonAsync<ChatDTO>();
+     }
+
+    private async Task AddUserToChat(string chatName)
+    {
+        chat = chats.FirstOrDefault(ch => ch.ChatName == chatName);
+        if (chat.UsersId.Contains(user.Id))
+        {
+            return;
+        }
+
+        await Http.PutAsJsonAsync("api/chats/addUser",new ChatToUpdateDTO()
+        {ChatName = chat.ChatName, userToUpdate = user.Id});
+    }
+
+    private async Task Send()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.SendAsync("AddMessage", user.Name, message);
+            message.Content = String.Empty;
+        }
+    }
+
+    private async Task Delete(MessageDTO message, bool forEveryone = true)
+    {
+        if (message.User != user.Id)
+        {
+            await _jsRuntime.InvokeVoidAsync("alert", "You can't delete messages from another user!");
+        }
+        else if (forEveryone)
+        {
+            await Http.DeleteAsync($"api/message/{message.Id}");
+            messages.Remove(messages.FirstOrDefault(m => m.Id == message.Id));
+            if (hubConnection is not null)
+            {
+                await hubConnection.SendAsync("DeleteMessage", message);
+            }
+            StateHasChanged();
+            CloseDelete();
+        }
+        else
+        {
+            var msg = new MessageDTO()
+            {
+                Chat = chat.Id,
+                PreviousMessage = "",
+                User = message.User,
+                Content = message.Content,
+                DateCreated = message.DateCreated,
+                isVisibleForUser = false,
+                Id = message.Id
+            };
+            await Http.PutAsJsonAsync("api/message/deleteForUser", msg);
+            messages.Remove(messages.FirstOrDefault(m => m.Id == message.Id));
+            if (hubConnection is not null)
+            {
+                await hubConnection.SendAsync("DeleteMessage", message);
+            }
+            StateHasChanged();
+            CloseDelete();
+        }
+        StateHasChanged();
+    }
+    
+    private bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
+    private bool isUserLogin = false;
+    private bool isChatChosen = false;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        users = await Http.GetFromJsonAsync<List<UserDTO>>("api/user");
+        chats = await Http.GetFromJsonAsync<List<ChatDTO>>("api/chats");
+    }
+
+    private async Task ChooseUser()
+    {
+        if (!users.Any(u => u.Name == user.Name))
+        {
+            await _jsRuntime.InvokeVoidAsync("alert", "There is no such user!");
+            return;
+        }
+        user = users.FirstOrDefault(u => u.Name == user.Name);
+        isUserLogin = true;
+    }
+
+    private async Task Reply(MessageDTO messageDto, bool toUser = false)
+    {
+        if (toUser)
+        {
+            chat = chats.FirstOrDefault(ch => ch.UsersId.Contains(user.Id) && ch.UsersId.Contains(messageDto.User) && ch.IsPrivate);
+            messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+            maxPage = messages.Count();
+            page = 0;
+            messages = messages.Skip(page * 20).Take(20).ToList();
+            message = new MessageDTO() {Chat = chat.Id, Content = String.Empty, User = user.Id};
+        }
+        message.Content = $"In reply to {messageDto.Content}:";
+    }
+
+    private async Task HandleInput(KeyboardEventArgs args)
+    {
+        if (args.Key.Equals("Enter"))
+        {
+            await Send();
+        }
+    }
+    private void HandleConnection(KeyboardEventArgs args)
+    {
+        if (args.Key.Equals("Enter"))
+        {
+            ChooseUser();
+        }
+    }
+
+    private async Task DetermineChange(MessageDTO message)
+    {
+        if (message.User == user.Id)
+        {
+            Open();
+            changingMessage = message.Content; 
+            changedMessage.Content = message.Content;
+            changedMessage.Id = message.Id;
+        }
+        else
+        {
+            await _jsRuntime.InvokeVoidAsync("alert", "You can't change someone's messages!");
+        }
+    }
+
+    private async Task Save(string msg = "")
+    {
+        var mess = new MessageDTO()
+        {
+            Id = changedMessage.Id,
+            Chat = chat.Id, PreviousMessage = user.Name + ": " + messageToChange,
+            User = user.Id, Content = changedMessage.Content, DateCreated = DateTime.Now, isVisibleForUser = true
+        };
+       await Http.PutAsJsonAsync("api/message/changeMessage", mess);
+        
+       messages = messages = await Http.GetFromJsonAsync<List<MessageDTO>>($"api/message/{chat.Id}");
+       messages = messages.Skip(page * 20).Take(20).ToList();
+       StateHasChanged();
+        await hubConnection.SendAsync("ChangeMessage", mess);
+    }
+    
+    public Guid Guid = Guid.NewGuid();
+    public string ModalDisplay = "none;";
+    public string ModalClass = "";
+
+    public string ModalDeleteClass = "";
+    public string ModalDeleteDisplay = "none;";
+    public bool ShowDeleteBackdrop = false;
+    
+    public string ModalMainClass = "";
+    public string ModalMainDisplay = "none;";
+    public bool ShowMainBackdrop = false;
+    
+    public bool ShowBackdrop = false;
+
+    public void OpenMain()
+    {
+        ModalMainClass = "Show";
+        ModalMainDisplay = "block;";
+        ShowMainBackdrop = true;
+        StateHasChanged();
+    }
+
+    public void CloseMain()
+    {
+        ModalMainClass = "";
+        ModalMainDisplay = "none;";
+        ShowMainBackdrop = false;
+        StateHasChanged();
+    }
+    
+    public void OpenDelete()
+    {
+        ModalDeleteDisplay = "block;";
+        ModalDeleteClass = "Show";
+        ShowDeleteBackdrop = true;
+        StateHasChanged();
+    }
+
+    public void CloseDelete()
+    {
+        ModalDeleteDisplay = "none;";
+        ModalDeleteClass = "";
+        ShowDeleteBackdrop = false;
+        StateHasChanged();
+    }
+
+    public void Open()
+    {
+        ModalDisplay = "block;";
+        ModalClass = "Show";
+        ShowBackdrop = true;
+        StateHasChanged();
+    }
+
+    public void Close(bool change = false)
+    {
+        if (change)
+        {
+            Save(changingMessage); 
+        }
+        ModalDisplay = "none";
+        ModalClass = "";
+        ShowBackdrop = false;
+        StateHasChanged();
+    }
+
+}
